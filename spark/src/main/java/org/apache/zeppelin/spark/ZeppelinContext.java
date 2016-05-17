@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.catalyst.expressions.Attribute;
@@ -284,80 +285,88 @@ public class ZeppelinContext extends HashMap<String, Object> {
   public static String showDF(SparkContext sc,
       InterpreterContext interpreterContext,
       Object df, int maxResult) {
-    Object[] rows = null;
-    Method take;
-    String jobGroup = "zeppelin-" + interpreterContext.getParagraphId();
-    sc.setJobGroup(jobGroup, "Zeppelin", false);
+    final ClassLoader old = Thread.currentThread().getContextClassLoader();
+    try
+    {
+      Thread.currentThread().setContextClassLoader(SparkConf.class.getClassLoader());
+      Object[] rows = null;
+      Method take;
+      String jobGroup = "zeppelin-" + interpreterContext.getParagraphId();
+      sc.setJobGroup(jobGroup, "Zeppelin", false);
 
-    try {
-      take = df.getClass().getMethod("take", int.class);
-      rows = (Object[]) take.invoke(df, maxResult + 1);
-    } catch (NoSuchMethodException | SecurityException | IllegalAccessException
-        | IllegalArgumentException | InvocationTargetException | ClassCastException e) {
-      sc.clearJobGroup();
-      throw new InterpreterException(e);
-    }
-
-    List<Attribute> columns = null;
-    // get field names
-    try {
-      // Use reflection because of classname returned by queryExecution changes from
-      // Spark <1.5.2 org.apache.spark.sql.SQLContext$QueryExecution
-      // Spark 1.6.0> org.apache.spark.sql.hive.HiveContext$QueryExecution
-      Object qe = df.getClass().getMethod("queryExecution").invoke(df);
-      Object a = qe.getClass().getMethod("analyzed").invoke(qe);
-      scala.collection.Seq seq = (scala.collection.Seq) a.getClass().getMethod("output").invoke(a);
-
-      columns = (List<Attribute>) scala.collection.JavaConverters.seqAsJavaListConverter(seq)
-                                                                 .asJava();
-    } catch (NoSuchMethodException | SecurityException | IllegalAccessException
-        | IllegalArgumentException | InvocationTargetException e) {
-      throw new InterpreterException(e);
-    }
-
-    String msg = null;
-    for (Attribute col : columns) {
-      if (msg == null) {
-        msg = col.name();
-      } else {
-        msg += "\t" + col.name();
+      try {
+        take = df.getClass().getMethod("take", int.class);
+        rows = (Object[]) take.invoke(df, maxResult + 1);
+      } catch (NoSuchMethodException | SecurityException | IllegalAccessException
+              | IllegalArgumentException | InvocationTargetException | ClassCastException e) {
+        sc.clearJobGroup();
+        throw new InterpreterException(e);
       }
-    }
 
-    msg += "\n";
+      List<Attribute> columns = null;
+      // get field names
+      try {
+        // Use reflection because of classname returned by queryExecution changes from
+        // Spark <1.5.2 org.apache.spark.sql.SQLContext$QueryExecution
+        // Spark 1.6.0> org.apache.spark.sql.hive.HiveContext$QueryExecution
+        Object qe = df.getClass().getMethod("queryExecution").invoke(df);
+        Object a = qe.getClass().getMethod("analyzed").invoke(qe);
+        scala.collection.Seq seq = (scala.collection.Seq) a.getClass().getMethod("output").invoke(a);
 
-    // ArrayType, BinaryType, BooleanType, ByteType, DecimalType, DoubleType, DynamicType,
-    // FloatType, FractionalType, IntegerType, IntegralType, LongType, MapType, NativeType,
-    // NullType, NumericType, ShortType, StringType, StructType
+        columns = (List<Attribute>) scala.collection.JavaConverters.seqAsJavaListConverter(seq)
+                                                                   .asJava();
+      } catch (NoSuchMethodException | SecurityException | IllegalAccessException
+              | IllegalArgumentException | InvocationTargetException e) {
+        throw new InterpreterException(e);
+      }
 
-    try {
-      for (int r = 0; r < maxResult && r < rows.length; r++) {
-        Object row = rows[r];
-        Method isNullAt = row.getClass().getMethod("isNullAt", int.class);
-        Method apply = row.getClass().getMethod("apply", int.class);
-
-        for (int i = 0; i < columns.size(); i++) {
-          if (!(Boolean) isNullAt.invoke(row, i)) {
-            msg += apply.invoke(row, i).toString();
-          } else {
-            msg += "null";
-          }
-          if (i != columns.size() - 1) {
-            msg += "\t";
-          }
+      String msg = null;
+      for (Attribute col : columns) {
+        if (msg == null) {
+          msg = col.name();
+        } else {
+          msg += "\t" + col.name();
         }
-        msg += "\n";
       }
-    } catch (NoSuchMethodException | SecurityException | IllegalAccessException
-        | IllegalArgumentException | InvocationTargetException e) {
-      throw new InterpreterException(e);
-    }
 
-    if (rows.length > maxResult) {
-      msg += "\n<font color=red>Results are limited by " + maxResult + ".</font>";
+      msg += "\n";
+
+      // ArrayType, BinaryType, BooleanType, ByteType, DecimalType, DoubleType, DynamicType,
+      // FloatType, FractionalType, IntegerType, IntegralType, LongType, MapType, NativeType,
+      // NullType, NumericType, ShortType, StringType, StructType
+
+      try {
+        for (int r = 0; r < maxResult && r < rows.length; r++) {
+          Object row = rows[r];
+          Method isNullAt = row.getClass().getMethod("isNullAt", int.class);
+          Method apply = row.getClass().getMethod("apply", int.class);
+
+          for (int i = 0; i < columns.size(); i++) {
+            if (!(Boolean) isNullAt.invoke(row, i)) {
+              msg += apply.invoke(row, i).toString();
+            } else {
+              msg += "null";
+            }
+            if (i != columns.size() - 1) {
+              msg += "\t";
+            }
+          }
+          msg += "\n";
+        }
+      } catch (NoSuchMethodException | SecurityException | IllegalAccessException
+              | IllegalArgumentException | InvocationTargetException e) {
+        throw new InterpreterException(e);
+      }
+
+      if (rows.length > maxResult) {
+        msg += "\n<font color=red>Results are limited by " + maxResult + ".</font>";
+      }
+      sc.clearJobGroup();
+      return "%table " + msg;
+    }finally
+    {
+      Thread.currentThread().setContextClassLoader(old);
     }
-    sc.clearJobGroup();
-    return "%table " + msg;
   }
 
   /**

@@ -240,29 +240,38 @@ public class SparkInterpreter extends Interpreter {
   }
 
   public SQLContext getSQLContext() {
-    if (sqlc == null) {
-      if (useHiveContext()) {
-        String name = "org.apache.spark.sql.hive.HiveContext";
-        Constructor<?> hc;
-        try {
-          hc = getClass().getClassLoader().loadClass(name)
-              .getConstructor(SparkContext.class);
-          sqlc = (SQLContext) hc.newInstance(getSparkContext());
-        } catch (NoSuchMethodException | SecurityException
-            | ClassNotFoundException | InstantiationException
-            | IllegalAccessException | IllegalArgumentException
-            | InvocationTargetException e) {
-          logger.warn("Can't create HiveContext. Fallback to SQLContext", e);
-          // when hive dependency is not loaded, it'll fail.
-          // in this case SQLContext can be used.
+    final ClassLoader old = Thread.currentThread().getContextClassLoader();
+    try
+    {
+      Thread.currentThread().setContextClassLoader(SparkConf.class.getClassLoader());
+      if (sqlc == null) {
+        if (useHiveContext()) {
+          String name = "org.apache.spark.sql.hive.HiveContext";
+          Constructor<?> hc;
+          try {
+            hc = getClass().getClassLoader().loadClass(name)
+                           .getConstructor(SparkContext.class);
+            sqlc = (SQLContext) hc.newInstance(getSparkContext());
+          } catch (NoSuchMethodException | SecurityException
+                  | ClassNotFoundException | InstantiationException
+                  | IllegalAccessException | IllegalArgumentException
+                  | InvocationTargetException e) {
+            logger.warn("Can't create HiveContext. Fallback to SQLContext", e);
+            // when hive dependency is not loaded, it'll fail.
+            // in this case SQLContext can be used.
+            sqlc = new SQLContext(getSparkContext());
+          }
+        } else {
           sqlc = new SQLContext(getSparkContext());
         }
-      } else {
-        sqlc = new SQLContext(getSparkContext());
       }
+
+      return sqlc;
+    }finally
+    {
+      Thread.currentThread().setContextClassLoader(old);
     }
 
-    return sqlc;
   }
 
   public DependencyResolver getDependencyResolver() {
