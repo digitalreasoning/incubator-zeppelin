@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
+import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.SQLContext;
 import org.apache.zeppelin.interpreter.Interpreter;
 import org.apache.zeppelin.interpreter.InterpreterContext;
@@ -111,39 +113,36 @@ public class SparkSqlInterpreter extends Interpreter {
 
   @Override
   public InterpreterResult interpret(String st, InterpreterContext context) {
-    SQLContext sqlc = null;
-    SparkInterpreter sparkInterpreter = getSparkInterpreter();
+    final ClassLoader old = Thread.currentThread().getContextClassLoader();
+    try
+    {
+      Thread.currentThread().setContextClassLoader(SparkConf.class.getClassLoader());
+      SQLContext sqlc = null;
+      SparkInterpreter sparkInterpreter = getSparkInterpreter();
 
-    if (sparkInterpreter.getSparkVersion().isUnsupportedVersion()) {
-      return new InterpreterResult(Code.ERROR, "Spark "
-          + sparkInterpreter.getSparkVersion().toString() + " is not supported");
+      if (sparkInterpreter.getSparkVersion().isUnsupportedVersion()) {
+        return new InterpreterResult(Code.ERROR, "Spark "
+                                                 + sparkInterpreter.getSparkVersion().toString() + " is not supported");
+      }
+
+      sqlc = getSparkInterpreter().getSQLContext();
+      SparkContext sc = sqlc.sparkContext();
+      if (concurrentSQL()) {
+        sc.setLocalProperty("spark.scheduler.pool", "fair");
+      } else {
+        sc.setLocalProperty("spark.scheduler.pool", null);
+      }
+
+      sc.setJobGroup(getJobGroup(context), "Zeppelin", false);
+      DataFrame rdd = sqlc.sql(st);
+      String msg = ZeppelinContext.showDF(sc, context, rdd, maxResult);
+      sc.clearJobGroup();
+      return new InterpreterResult(Code.SUCCESS, msg);
     }
-
-    sqlc = getSparkInterpreter().getSQLContext();
-    SparkContext sc = sqlc.sparkContext();
-    if (concurrentSQL()) {
-      sc.setLocalProperty("spark.scheduler.pool", "fair");
-    } else {
-      sc.setLocalProperty("spark.scheduler.pool", null);
+    finally
+    {
+      Thread.currentThread().setContextClassLoader(old);
     }
-
-    sc.setJobGroup(getJobGroup(context), "Zeppelin", false);
-    Object rdd = null;
-    try {
-      // method signature of sqlc.sql() is changed
-      // from  def sql(sqlText: String): SchemaRDD (1.2 and prior)
-      // to    def sql(sqlText: String): DataFrame (1.3 and later).
-      // Therefore need to use reflection to keep binary compatibility for all spark versions.
-      Method sqlMethod = sqlc.getClass().getMethod("sql", String.class);
-      rdd = sqlMethod.invoke(sqlc, st);
-    } catch (NoSuchMethodException | SecurityException | IllegalAccessException
-        | IllegalArgumentException | InvocationTargetException e) {
-      throw new InterpreterException(e);
-    }
-
-    String msg = ZeppelinContext.showDF(sc, context, rdd, maxResult);
-    sc.clearJobGroup();
-    return new InterpreterResult(Code.SUCCESS, msg);
   }
 
   @Override
