@@ -127,13 +127,10 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
           } catch (IOException e1) {
             throw new InterpreterException(e1);
           }
+          ;
           CommandLine cmdLine = CommandLine.parse(interpreterRunner);
-          cmdLine.addArgument("-d", false);
-          cmdLine.addArgument(interpreterDir, false);
-          cmdLine.addArgument("-p", false);
+          cmdLine.addArguments(interpreterGroup.getProperty().getProperty("synthesys.notebook.interpreter.args", "--max-heap 1g"));
           cmdLine.addArgument(Integer.toString(port), false);
-          cmdLine.addArgument("-l", false);
-          cmdLine.addArgument(localRepoDir, false);
 
           executor = new DefaultExecutor();
 
@@ -172,8 +169,15 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
           }
         }
 
-        clientPool = new GenericObjectPool<Client>(new ClientFactory(host, port));
-
+        final ClassLoader old = Thread.currentThread().getContextClassLoader();
+        try
+        {
+          Thread.currentThread().setContextClassLoader(RemoteInterpreterProcess.class.getClassLoader());
+          clientPool = new GenericObjectPool<Client>(new ClientFactory(host, port));
+        }
+        finally {
+          Thread.currentThread().setContextClassLoader(old);
+        }
         remoteInterpreterEventPoller.setInterpreterGroup(interpreterGroup);
         remoteInterpreterEventPoller.setInterpreterProcess(this);
         remoteInterpreterEventPoller.start();

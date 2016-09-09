@@ -86,7 +86,7 @@ public class ZeppelinConfiguration extends XMLConfiguration {
         url = cl.getResource(ZEPPELIN_SITE_XML);
       }
     }
-    if (url == null) {
+    if (url == null && classLoader != null) {
       url = classLoader.getResource(ZEPPELIN_SITE_XML);
     }
 

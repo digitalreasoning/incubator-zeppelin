@@ -49,6 +49,16 @@
     <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/zeppelin.git</developerConnection>
   </scm>
 
+  <repositories>
+    <repository>
+      <id>drsi-releases</id>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <url>https://nexus.corp.digitalreasoning.com/nexus/content/repositories/releases</url>
+    </repository>
+  </repositories>
+
   <inceptionYear>2013</inceptionYear>
 
   <modules>

@@ -64,6 +64,7 @@ public class Note implements Serializable, JobListener {
 
   private String name = "";
   private String id;
+  private boolean template = false;
 
   private transient ZeppelinConfiguration conf = ZeppelinConfiguration.create();
 
@@ -583,4 +584,12 @@ public class Note implements Serializable, JobListener {
 
   @Override
   public void onProgressUpdate(Job job, int progress) {}
+
+  public boolean isTemplate() {
+    return template;
+  }
+
+  public void setTemplate(boolean template) {
+    this.template = template;
+  }
 }

@@ -14,7 +14,7 @@
 
 body {
   padding-top: 50px;
-  color: #212121;
+  color: #263238;
 }
 
 html,
@@ -52,7 +52,7 @@ body .navbar {
 }
 
 .navbar-inverse {
-  background: #3071a9;
+  background: #2196F3;
   color: #fff;
   border-color: #3071a9;
   font-size: 18px;
@@ -278,7 +278,10 @@ a.navbar-brand:hover {
 }
 
 #main {
-  padding: 10px;
+  padding-top: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  padding-left: 0;
   height: 100%;
 }
 
@@ -358,13 +361,18 @@ a.navbar-brand:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
   vertical-align: middle;
-  margin: 0 0 15px;
+  margin: 0 0 5px;
   padding-bottom: 2px;
+  font-size: 20px;
 }
 
 .box-heading > .btn-group,
 .box-heading > .btn {
   margin-top: -3px;
+}
+
+.box-subheading {
+  color: #B0BEC5;
 }
 
 .icheck-label {
@@ -373,16 +381,7 @@ a.navbar-brand:hover {
 }
 
 .zeppelin {
-  background: url('/assets/images/zepLogo.png') no-repeat right;
   height: 380px;
-  opacity: 0.2;
-}
-
-.zeppelin2 {
-  background: url('/assets/images/zepLogo.png') no-repeat right;
-  background-position-y: 12px;
-  height: 380px;
-  opacity: 0.2;
 }
 
 .keys {
@@ -824,4 +823,47 @@ This part should be removed when new version of bootstrap handles this issue.
 
 .about .logo img{
   width: 100%;
+}
+
+.dr-table {
+  width: 100%;
+  margin: 20px auto;
+}
+.dr-table thead th {
+  color: #90A4AE;
+  font-weight: normal;
+  padding: 10px;
+  border-bottom: 1px solid #CFD8DC;
+  border-top: 1px solid #CFD8DC;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.dr-table tbody td {
+  padding: 12px;
+  color: #90A4AE;
+  border-bottom: 1px solid #ECEFF1;
+}
+.dr-table tbody td:first-child {
+  position: relative;
+  padding-left: 40px;
+}
+.dr-table tbody td:first-child:before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translate(0, -50%);
+  width: 18px;
+  height: 18px;
+  background-image: url('../assets/images/xml-file.svg');
+  background-repeat: no-repeat;
+  display: block;
+}
+.dr-table tbody tr:hover td {
+  background: #FFFF8D;
+  cursor: pointer;
+  color: #263238;
+}
+.dr-table tbody tr:hover td:first-child:before {
+  background-image: url('../assets/images/xml-file-dark.svg');
 }

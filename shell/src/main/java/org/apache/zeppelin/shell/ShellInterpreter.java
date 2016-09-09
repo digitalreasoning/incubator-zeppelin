@@ -56,6 +56,17 @@ public class ShellInterpreter extends Interpreter {
     super(property);
   }
 
+  static {
+    Interpreter.register(
+            "sh",
+            "sh",
+            ShellInterpreter.class.getName(),
+            new InterpreterPropertyBuilder()
+                    .add(SHELL_COMMAND_TIMEOUT, "60000", "Shell command time out in millisecs. Default = 60000")
+                    .build()
+    );
+  }
+
   @Override
   public void open() {
     logger.info("Command timeout is set as:", SHELL_COMMAND_TIMEOUT);

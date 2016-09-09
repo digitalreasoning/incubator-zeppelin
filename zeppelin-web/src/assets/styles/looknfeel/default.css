@@ -37,3 +37,57 @@ body {
   top: 100px;
 }
 
+.dr-btn {
+	display: inline-block;
+	padding: 10px 15px 10px 15px;
+	margin: 0 8px 0 8px;
+	border-radius: 2px;
+	font-size: 11px;
+	letter-spacing: 1px;
+	text-align: center;
+	text-transform: uppercase;
+	text-decoration:none;
+	border: none;
+	outline: none;
+	color: #FFFFFF;
+	background-color: #90A4AE;
+}
+.dr-btn:hover {
+	background-color: #607D8B;
+}
+.dr-btn.primary {
+  background-color: #4CAF50;
+  color: #FFFFFF;
+}
+.dr-btn.primary:hover {
+	background-color: #388E3C;
+}
+.dr-btn.icon {
+	padding-left: 35px;
+	position: relative;
+}
+.dr-btn.icon:before {
+	position: absolute;
+	display: block;
+	top: 50%;
+	left: 10px;
+	transform: translate(0, -50%);
+	height: 18px;
+	width: 18px;
+	background-repeat: no-repeat;
+	background-position: center center;
+	background-size: contain;
+	content: '';
+}
+.dr-btn.icon.create:before {
+	background-image: url('../../../assets/images/add-upload-file.svg');
+}
+.dr-btn.icon.upload:before {
+	background-image: url('../../../assets/images/upload.svg');
+}
+#noteImportModal .display-inline a.dr-fa-blue {
+ 	color: #2196F3 !important;
+}
+#noteImportModal .display-inline a.dr-fa-blue p {
+  color: #263238;
+}

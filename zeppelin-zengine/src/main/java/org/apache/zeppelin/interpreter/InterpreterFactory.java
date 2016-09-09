@@ -55,6 +55,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.StreamSupport;
 
 /**
  * Manage interpreters.
@@ -118,7 +119,7 @@ public class InterpreterFactory implements InterpreterGroupFactory {
 
   private void init() throws InterpreterException, IOException, RepositoryException {
     String interpreterJson = conf.getInterpreterJson();
-    ClassLoader cl = Thread.currentThread().getContextClassLoader();
+    ClassLoader cl = InterpreterFactory.class.getClassLoader();
 
     Path interpretersDir = Paths.get(conf.getInterpreterDir());
     if (Files.exists(interpretersDir)) {
@@ -828,7 +829,7 @@ public class InterpreterFactory implements InterpreterGroupFactory {
       throws InterpreterException {
     logger.info("Create repl {} from {}", className, dirName);
 
-    ClassLoader oldcl = Thread.currentThread().getContextClassLoader();
+    ClassLoader oldcl = InterpreterFactory.class.getClassLoader();
     try {
 
       URLClassLoader ccl = cleanCl.get(dirName);

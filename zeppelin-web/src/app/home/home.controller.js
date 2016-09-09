@@ -13,7 +13,7 @@
  */
 'use strict';
 
-angular.module('zeppelinWebApp').controller('HomeCtrl', function($scope, notebookListDataFactory, websocketMsgSrv, $rootScope, arrayOrderingSrv, $http, baseUrlSrv) {
+angular.module('zeppelinWebApp').controller('HomeCtrl', function($scope, notebookListDataFactory, websocketMsgSrv, $rootScope, arrayOrderingSrv, $http, baseUrlSrv, $location) {
   var vm = this;
   vm.notes = notebookListDataFactory;
   vm.websocketMsgSrv = websocketMsgSrv;
@@ -69,4 +69,7 @@ angular.module('zeppelinWebApp').controller('HomeCtrl', function($scope, noteboo
     $rootScope.$broadcast('initLoginValues');
   });
 
+  vm.loadNotebook = function(path) {
+    $location.path(path);
+  };
 });

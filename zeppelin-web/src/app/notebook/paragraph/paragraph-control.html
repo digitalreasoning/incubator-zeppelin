@@ -25,18 +25,18 @@ limitations under the License.
   <!-- Run / Cancel button -->
   <span class="icon-control-play" style="cursor:pointer;color:#3071A9" tooltip-placement="top" tooltip="Run this paragraph (Shift+Enter)"
         ng-click="runParagraph(getEditorValue())"
-        ng-show="paragraph.status!='RUNNING' && paragraph.status!='PENDING' && paragraph.config.enabled"></span>
+        ng-show="paragraph.status!='RUNNING' && paragraph.status!='PENDING' && paragraph.config.enabled && !note.template"></span>
   <span class="icon-control-pause" style="cursor:pointer;color:#CD5C5C" tooltip-placement="top" tooltip="Cancel"
         ng-click="cancelParagraph()"
-        ng-show="paragraph.status=='RUNNING' || paragraph.status=='PENDING'"></span>
+        ng-show="paragraph.status=='RUNNING' || paragraph.status=='PENDING' && !note.template"></span>
   <span class="{{paragraph.config.editorHide ? 'icon-size-fullscreen' : 'icon-size-actual'}}" style="cursor:pointer;" tooltip-placement="top" tooltip="{{(paragraph.config.editorHide ? 'Show' : 'Hide') + ' editor'}}"
-        ng-click="toggleEditor()"></span>
+        ng-click="toggleEditor()" ng-show="!note.template"></span>
   <span class="{{paragraph.config.tableHide ? 'icon-notebook' : 'icon-book-open'}}" style="cursor:pointer;" tooltip-placement="top" tooltip="{{(paragraph.config.tableHide ? 'Show' : 'Hide') + ' output'}}"
-        ng-click="toggleOutput()"></span>
+        ng-click="toggleOutput()" ng-show="!note.template"></span>
   <span class="dropdown navbar-right">
     <span class="icon-settings" style="cursor:pointer"
           data-toggle="dropdown"
-          type="button">
+          type="button"  ng-show="!note.template">
     </span>
     <ul class="dropdown-menu" role="menu" style="width:200px;z-index:1002">
       <li ng-click="$event.stopPropagation()" style="text-align:center;margin-top:4px;">

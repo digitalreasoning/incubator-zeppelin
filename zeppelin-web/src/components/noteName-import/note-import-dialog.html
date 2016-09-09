@@ -25,8 +25,8 @@ limitations under the License.
         <div class="modal-body">
 
           <div class="form-group">
-            <label for="noteImportName">Import AS</label>
-            <input placeholder="Note name" type="text" class="form-control" id="noteImportName"
+            <label for="noteImportName">Notebook Name</label>
+            <input placeholder="Notebook name" type="text" class="form-control" id="noteImportName"
                    ng-model="note.noteImportName">
           </div>
 
@@ -36,16 +36,16 @@ limitations under the License.
 
           <div class="form-group slide-left" ng-show="note.step1">
             <div class="display-inline">
-              <a class="fa fa-cloud-upload import-file-upload" ng-click="uploadFile()">
+              <a class="fa fa-cloud-upload import-file-upload dr-fa-blue" ng-click="uploadFile()">
                 <p>Choose a JSON here</p>
               </a>
             </div>
             <div style="display: none">
-              <input placeholder="Note name" type="file" class="form-control" id="noteImportFile"
+              <input placeholder="Notebook name" type="file" class="form-control" id="noteImportFile"
                      ng-model="note.importFile" onchange="angular.element(this).scope().importFile(this)">
             </div>
             <div class="display-inline">
-              <a href="javascript:void(0);" ng-click="uploadURL()" class="fa fa-link">
+              <a href="javascript:void(0);" ng-click="uploadURL()" class="fa fa-link dr-fa-blue">
                 <p>Add from URL</p>
               </a>
             </div>
@@ -54,7 +54,7 @@ limitations under the License.
           <div class="form-group slide-right" ng-show="note.step2">
 
             <label for="noteImportUrl">URL</label>
-            <input placeholder="Note name" type="text" class="form-control" id="noteImportUrl"
+            <input placeholder="Notebook name" type="text" class="form-control" id="noteImportUrl"
                    ng-model="note.importUrl">
           </div>
 

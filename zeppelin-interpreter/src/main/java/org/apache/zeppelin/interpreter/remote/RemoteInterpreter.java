@@ -168,7 +168,6 @@ public class RemoteInterpreter extends Interpreter {
       boolean broken = false;
       try {
         logger.info("Create remote interpreter {}", getClassName());
-        property.put("zeppelin.interpreter.localRepo", localRepoPath);
         client.createInterpreter(groupId, noteId,
           getClassName(), (Map) property);
 
