@@ -144,7 +144,12 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
 
             logger.info("Run interpreter process {}", cmdLine);
             executor.execute(cmdLine, procEnv, this);
-
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+              @Override
+              public void run() {
+                watchdog.destroyProcess();
+              }
+            }));
           } catch (IOException e) {
             running = false;
             throw new InterpreterException(e);
