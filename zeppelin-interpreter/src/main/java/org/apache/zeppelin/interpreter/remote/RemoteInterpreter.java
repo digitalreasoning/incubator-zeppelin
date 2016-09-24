@@ -77,6 +77,12 @@ public class RemoteInterpreter extends Interpreter {
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = maxPoolSize;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+      @Override
+      public void run() {
+        RemoteInterpreter.this.close();
+      }
+    }));
   }
 
   public RemoteInterpreter(Properties property,
@@ -99,6 +105,12 @@ public class RemoteInterpreter extends Interpreter {
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = 10;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+      @Override
+      public void run() {
+        RemoteInterpreter.this.close();
+      }
+    }));
   }
 
   private Map<String, String> getEnvFromInterpreterProperty(Properties property) {
