@@ -128,7 +128,7 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
             throw new InterpreterException(e1);
           }
           ;
-          CommandLine cmdLine = CommandLine.parse(interpreterRunner);
+          CommandLine cmdLine = new CommandLine(interpreterRunner);
           cmdLine.addArguments(interpreterGroup.getProperty().getProperty("synthesys.notebook.interpreter.args", "--max-heap 1g"));
           cmdLine.addArgument(Integer.toString(port), false);
 
