@@ -258,16 +258,42 @@ public class RemoteInterpreter extends Interpreter {
     {
       Client client = process.getClient();
       int pid = client.getPid();
-      Runtime.getRuntime().exec("kill " + pid).exitValue();
-      int status = Runtime.getRuntime().exec("kill -0 " + pid).exitValue();
+      Runtime.getRuntime().exec("kill " + pid);
+      sleep(5000);
+      int status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
       if(status != 0)
       {
-        Runtime.getRuntime().exec("kill -9 " + pid);
+        return;
+      }
+      else
+      {
+        Runtime.getRuntime().exec("kill -2" + pid);
+        sleep(5000);
+        status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
+        if(status != 0)
+        {
+          return;
+        }
+        else
+        {
+          Runtime.getRuntime().exec("kill -9 " + pid);
+        }
       }
     }
     catch (Exception e)
     {
       throw new RuntimeException("Failed to force-kill the interpreter");
+    }
+  }
+
+  private void sleep(int ms)
+  {
+    try
+    {
+      Thread.sleep(ms);
+    }catch(InterruptedException e)
+    {
+      // do nothing
     }
   }
 
