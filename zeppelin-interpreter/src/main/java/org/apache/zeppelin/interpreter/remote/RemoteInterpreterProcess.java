@@ -179,6 +179,7 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
         remoteInterpreterEventPoller.setInterpreterGroup(interpreterGroup);
         remoteInterpreterEventPoller.setInterpreterProcess(this);
         remoteInterpreterEventPoller.start();
+        
       }
       return referenceCount.incrementAndGet();
     }

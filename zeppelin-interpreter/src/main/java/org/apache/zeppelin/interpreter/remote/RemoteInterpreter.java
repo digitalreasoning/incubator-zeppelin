@@ -18,6 +18,12 @@
 package org.apache.zeppelin.interpreter.remote;
 
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.thrift.TException;
 import org.apache.zeppelin.display.AngularObject;
@@ -227,25 +233,79 @@ public class RemoteInterpreter extends Interpreter {
 
   @Override
   public void close() {
-    RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
+    ExecutorService service = Executors.newSingleThreadExecutor();
+    Future future = null;
+    try
+    {
+      future = service.submit(new CloserTask());
+      future.get(10, TimeUnit.SECONDS);
+      return;
+    }
+    catch(InterruptedException | ExecutionException | TimeoutException e)
+    {
+      if(future != null && !future.isDone())
+      {
+        future.cancel(true);
+      }
+      forceKill();
+    }
+  }
 
-    Client client = null;
-    boolean broken = false;
-    try {
-      client = interpreterProcess.getClient();
-      if (client != null) {
-        client.close(noteId, className);
+  private void forceKill()
+  {
+    RemoteInterpreterProcess process = getInterpreterProcess();
+    try
+    {
+      Client client = process.getClient();
+      int pid = client.getPid();
+      Runtime.getRuntime().exec("kill " + pid).exitValue();
+      int status = Runtime.getRuntime().exec("kill -0 " + pid).exitValue();
+      if(status != 0)
+      {
+        Runtime.getRuntime().exec("kill -9 " + pid);
       }
-    } catch (TException e) {
-      broken = true;
-      throw new InterpreterException(e);
-    } catch (Exception e1) {
-      throw new InterpreterException(e1);
-    } finally {
-      if (client != null) {
-        interpreterProcess.releaseClient(client, broken);
+    }
+    catch (Exception e)
+    {
+      throw new RuntimeException("Failed to force-kill the interpreter");
+    }
+  }
+
+  private class CloserTask implements Runnable
+  {
+
+    @Override
+    public void run()
+    {
+      RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
+
+      Client client = null;
+      boolean broken = false;
+      try
+      {
+        client = interpreterProcess.getClient();
+        if (client != null)
+        {
+          client.close(noteId, className);
+        }
       }
-      getInterpreterProcess().dereference();
+      catch (TException e)
+      {
+        broken = true;
+        throw new InterpreterException(e);
+      }
+      catch (Exception e1)
+      {
+        throw new InterpreterException(e1);
+      }
+      finally
+      {
+        if (client != null)
+        {
+          interpreterProcess.releaseClient(client, broken);
+        }
+        getInterpreterProcess().dereference();
+      }
     }
   }
 

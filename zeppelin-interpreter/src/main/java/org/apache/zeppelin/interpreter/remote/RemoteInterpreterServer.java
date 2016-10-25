@@ -45,6 +45,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.sun.jna.Library;
+import com.sun.jna.Native;
 
 /**
  * Entry point for Interpreter process.
@@ -708,4 +710,17 @@ public class RemoteInterpreterServer
       logger.info("Exception in RemoteInterpreterServer while angularRegistryPush, nolock", e);
     }
   }
+
+  @Override
+  public int getPid(){
+    return Clibrary.INSTANCE.getpid();
+  }
+
+  private interface Clibrary extends Library {
+    Clibrary INSTANCE = (Clibrary) Native.loadLibrary("c", Clibrary.class);
+
+    int getpid();
+  }
+
+
 }
