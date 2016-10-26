@@ -17,6 +17,7 @@
 
 package org.apache.zeppelin.interpreter.remote;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -61,6 +62,9 @@ public class RemoteInterpreter extends Interpreter {
   private Map<String, String> env;
   private int connectTimeout;
   private int maxPoolSize;
+  private int closeTimeoutMillis;
+  private int waitBetweeenKillsMillis;
+  private int pid = -1;
   private static String schedulerName;
 
   public RemoteInterpreter(Properties property,
@@ -71,6 +75,8 @@ public class RemoteInterpreter extends Interpreter {
       String localRepoPath,
       int connectTimeout,
       int maxPoolSize,
+      int closeTimeoutMillis,
+      int waitBetweenKillsMillis,
       RemoteInterpreterProcessListener remoteInterpreterProcessListener) {
     super(property);
     this.noteId = noteId;
@@ -82,6 +88,8 @@ public class RemoteInterpreter extends Interpreter {
     env = getEnvFromInterpreterProperty(property);
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = maxPoolSize;
+    this.closeTimeoutMillis = closeTimeoutMillis;
+    this.waitBetweeenKillsMillis = waitBetweenKillsMillis;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -110,6 +118,7 @@ public class RemoteInterpreter extends Interpreter {
     this.env = env;
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = 10;
+    this.closeTimeoutMillis = 10000;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -222,6 +231,13 @@ public class RemoteInterpreter extends Interpreter {
         }
         try {
           ((RemoteInterpreter) p).init();
+          RemoteInterpreterProcess process = getInterpreterProcess();
+          try {
+            Client client = process.getClient();
+            this.pid = client.getPid();
+          }catch(Exception e) {
+            pid = -1;
+          }
         } catch (InterpreterException e) {
           logger.error("Failed to initialize interpreter: {}. Remove it from interpreterGroup",
               p.getClassName());
@@ -235,99 +251,81 @@ public class RemoteInterpreter extends Interpreter {
   public void close() {
     ExecutorService service = Executors.newSingleThreadExecutor();
     Future future = null;
-    try
-    {
+    try {
       future = service.submit(new CloserTask());
-      future.get(10, TimeUnit.SECONDS);
+      future.get(closeTimeoutMillis, TimeUnit.MILLISECONDS);
       return;
-    }
-    catch(InterruptedException | ExecutionException | TimeoutException e)
-    {
-      if(future != null && !future.isDone())
-      {
+    }catch(InterruptedException | ExecutionException | TimeoutException e) {
+      if(future != null && !future.isDone()) {
         future.cancel(true);
       }
-      forceKill();
+      logger.info("Failed to close interpreter normally, moving to force-kill");
+      forceKill(pid);
     }
   }
 
-  private void forceKill()
-  {
-    RemoteInterpreterProcess process = getInterpreterProcess();
-    try
-    {
-      Client client = process.getClient();
-      int pid = client.getPid();
+  private void forceKill(int pid) {
+    if(pid == -1){
+      throw new RuntimeException("Failed to identify the pid of interpreter process");
+    }
+    try {
       Runtime.getRuntime().exec("kill " + pid);
-      sleep(5000);
-      int status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
-      if(status != 0)
-      {
+      logger.info("Issuing kill command for process " + pid);
+      sleep(waitBetweeenKillsMillis);
+      if(isProcessTerminated(pid)) {
         return;
       }
-      else
-      {
-        Runtime.getRuntime().exec("kill -2 " + pid);
-        sleep(5000);
-        status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
-        if(status != 0)
-        {
-          return;
-        }
-        else
-        {
-          Runtime.getRuntime().exec("kill -9 " + pid);
-        }
+      logger.info("Kill command failed. Issuing kill -2 command for process " + pid);
+      Runtime.getRuntime().exec("kill -2 " + pid);
+      sleep(waitBetweeenKillsMillis);
+      if(isProcessTerminated(pid)) {
+        return;
       }
-    }
-    catch (Exception e)
-    {
+      logger.warn("Kill -2 command failed. Issuing kill -9 command for process " + pid);
+      Runtime.getRuntime().exec("kill -9 " + pid);
+    }catch (Exception e) {
       throw new RuntimeException("Failed to force-kill the interpreter");
     }
   }
 
-  private void sleep(int ms)
-  {
-    try
-    {
+  private void sleep(int ms) {
+    try {
       Thread.sleep(ms);
-    }catch(InterruptedException e)
-    {
+    }catch(InterruptedException e) {
       // do nothing
     }
   }
 
-  private class CloserTask implements Runnable
-  {
+  private boolean isProcessTerminated(int pid) {
+    try {
+      int status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
+      return status == 0;
+    }catch(IOException | InterruptedException e) {
+      throw new RuntimeException("Failed to force-kill the interpreter");
+    }
+  }
+
+  private class CloserTask implements Runnable {
 
     @Override
-    public void run()
-    {
+    public void run() {
       RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
 
       Client client = null;
       boolean broken = false;
-      try
-      {
+      try {
         client = interpreterProcess.getClient();
-        if (client != null)
-        {
+        if (client != null) {
           client.close(noteId, className);
         }
-      }
-      catch (TException e)
-      {
+      }catch (TException e) {
         broken = true;
         throw new InterpreterException(e);
-      }
-      catch (Exception e1)
-      {
+      }catch (Exception e1) {
         throw new InterpreterException(e1);
       }
-      finally
-      {
-        if (client != null)
-        {
+      finally {
+        if (client != null) {
           interpreterProcess.releaseClient(client, broken);
         }
         getInterpreterProcess().dereference();
