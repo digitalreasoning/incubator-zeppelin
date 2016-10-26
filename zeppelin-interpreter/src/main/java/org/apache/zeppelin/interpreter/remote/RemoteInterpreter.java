@@ -267,7 +267,7 @@ public class RemoteInterpreter extends Interpreter {
       }
       else
       {
-        Runtime.getRuntime().exec("kill -2" + pid);
+        Runtime.getRuntime().exec("kill -2 " + pid);
         sleep(5000);
         status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
         if(status != 0)
