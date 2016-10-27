@@ -890,8 +890,8 @@ public class InterpreterFactory implements InterpreterGroupFactory {
     int connectTimeout = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT);
     String localRepoPath = conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId;
     int maxPoolSize = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE);
-    int closeTimeoutMillis = conf.getInt("synthesys.notebook.interpreter.closeTimeoutMillis", (1000 * 10));
-    int waitBetweenKillsMillis = conf.getInt("synthesys.notebook.interpreter.waitBetweenKillsMillis", (1000 * 5));
+    int closeTimeoutMillis = conf.getInt("zeppelin.interpreter.closeTimeoutMillis", (1000 * 10));
+    int waitBetweenKillsMillis = conf.getInt("zeppelin.interpreter.waitBetweenKillsMillis", (1000 * 5));
     LazyOpenInterpreter intp = new LazyOpenInterpreter(new RemoteInterpreter(
         property, noteId, className, conf.getInterpreterRemoteRunnerPath(),
         interpreterPath, localRepoPath, connectTimeout,
