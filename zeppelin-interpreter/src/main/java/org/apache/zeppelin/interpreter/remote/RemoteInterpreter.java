@@ -17,7 +17,14 @@
 
 package org.apache.zeppelin.interpreter.remote;
 
+import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.thrift.TException;
 import org.apache.zeppelin.display.AngularObject;
@@ -55,6 +62,9 @@ public class RemoteInterpreter extends Interpreter {
   private Map<String, String> env;
   private int connectTimeout;
   private int maxPoolSize;
+  private int closeTimeoutMillis;
+  private int waitBetweeenKillsMillis;
+  private int pid = -1;
   private static String schedulerName;
 
   public RemoteInterpreter(Properties property,
@@ -65,6 +75,8 @@ public class RemoteInterpreter extends Interpreter {
       String localRepoPath,
       int connectTimeout,
       int maxPoolSize,
+      int closeTimeoutMillis,
+      int waitBetweenKillsMillis,
       RemoteInterpreterProcessListener remoteInterpreterProcessListener) {
     super(property);
     this.noteId = noteId;
@@ -76,6 +88,8 @@ public class RemoteInterpreter extends Interpreter {
     env = getEnvFromInterpreterProperty(property);
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = maxPoolSize;
+    this.closeTimeoutMillis = closeTimeoutMillis;
+    this.waitBetweeenKillsMillis = waitBetweenKillsMillis;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -104,6 +118,7 @@ public class RemoteInterpreter extends Interpreter {
     this.env = env;
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = 10;
+    this.closeTimeoutMillis = 10000;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -216,6 +231,13 @@ public class RemoteInterpreter extends Interpreter {
         }
         try {
           ((RemoteInterpreter) p).init();
+          RemoteInterpreterProcess process = getInterpreterProcess();
+          try {
+            Client client = process.getClient();
+            this.pid = client.getPid();
+          }catch(Exception e) {
+            pid = -1;
+          }
         } catch (InterpreterException e) {
           logger.error("Failed to initialize interpreter: {}. Remove it from interpreterGroup",
               p.getClassName());
@@ -227,25 +249,87 @@ public class RemoteInterpreter extends Interpreter {
 
   @Override
   public void close() {
-    RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
-
-    Client client = null;
-    boolean broken = false;
+    ExecutorService service = Executors.newSingleThreadExecutor();
+    Future future = null;
     try {
-      client = interpreterProcess.getClient();
-      if (client != null) {
-        client.close(noteId, className);
+      future = service.submit(new CloserTask());
+      future.get(closeTimeoutMillis, TimeUnit.MILLISECONDS);
+      return;
+    }catch(InterruptedException | ExecutionException | TimeoutException e) {
+      if(future != null && !future.isDone()) {
+        future.cancel(true);
       }
-    } catch (TException e) {
-      broken = true;
-      throw new InterpreterException(e);
-    } catch (Exception e1) {
-      throw new InterpreterException(e1);
-    } finally {
-      if (client != null) {
-        interpreterProcess.releaseClient(client, broken);
+      logger.info("Failed to close interpreter normally, moving to force-kill");
+      forceKill(pid);
+    }
+  }
+
+  private void forceKill(int pid) {
+    if(pid == -1){
+      throw new RuntimeException("Failed to identify the pid of interpreter process");
+    }
+    try {
+      Runtime.getRuntime().exec("kill " + pid);
+      logger.info("Issuing kill command for process " + pid);
+      sleep(waitBetweeenKillsMillis);
+      if(isProcessTerminated(pid)) {
+        return;
       }
-      getInterpreterProcess().dereference();
+      logger.info("Kill command failed. Issuing kill -2 command for process " + pid);
+      Runtime.getRuntime().exec("kill -2 " + pid);
+      sleep(waitBetweeenKillsMillis);
+      if(isProcessTerminated(pid)) {
+        return;
+      }
+      logger.warn("Kill -2 command failed. Issuing kill -9 command for process " + pid);
+      Runtime.getRuntime().exec("kill -9 " + pid);
+    }catch (Exception e) {
+      throw new RuntimeException("Failed to force-kill the interpreter");
+    }
+  }
+
+  private void sleep(int ms) {
+    try {
+      Thread.sleep(ms);
+    }catch(InterruptedException e) {
+      // do nothing
+    }
+  }
+
+  private boolean isProcessTerminated(int pid) {
+    try {
+      int status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
+      return status == 0;
+    }catch(IOException | InterruptedException e) {
+      throw new RuntimeException("Failed to force-kill the interpreter");
+    }
+  }
+
+  private class CloserTask implements Runnable {
+
+    @Override
+    public void run() {
+      RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
+
+      Client client = null;
+      boolean broken = false;
+      try {
+        client = interpreterProcess.getClient();
+        if (client != null) {
+          client.close(noteId, className);
+        }
+      }catch (TException e) {
+        broken = true;
+        throw new InterpreterException(e);
+      }catch (Exception e1) {
+        throw new InterpreterException(e1);
+      }
+      finally {
+        if (client != null) {
+          interpreterProcess.releaseClient(client, broken);
+        }
+        getInterpreterProcess().dereference();
+      }
     }
   }
 

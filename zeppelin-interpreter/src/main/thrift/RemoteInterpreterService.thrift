@@ -99,4 +99,5 @@ service RemoteInterpreterService {
   void angularObjectAdd(1: string name, 2: string noteId, 3: string paragraphId, 4: string object);
   void angularObjectRemove(1: string name, 2: string noteId, 3: string paragraphId);
   void angularRegistryPush(1: string registry);
+  i32 getPid();
 }
