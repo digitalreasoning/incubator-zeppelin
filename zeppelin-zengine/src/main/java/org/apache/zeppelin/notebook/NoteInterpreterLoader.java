@@ -130,9 +130,10 @@ public class NoteInterpreterLoader {
     Interpreter.RegisteredInterpreter interpreter = null;
 
 
-    for(Interpreter.RegisteredInterpreter registeredInterpreter : Interpreter.registeredInterpreters.values())
+    for (Interpreter.RegisteredInterpreter registeredInterpreter :
+            Interpreter.registeredInterpreters.values())
     {
-      if(registeredInterpreter.getName().equals(replName))
+      if (registeredInterpreter.getName().equals(replName))
       {
         interpreter = registeredInterpreter;
         break;

@@ -19,12 +19,7 @@ package org.apache.zeppelin.interpreter.remote;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.thrift.TException;
 import org.apache.zeppelin.display.AngularObject;
@@ -62,8 +57,7 @@ public class RemoteInterpreter extends Interpreter {
   private Map<String, String> env;
   private int connectTimeout;
   private int maxPoolSize;
-  private int closeTimeoutMillis;
-  private int waitBetweeenKillsMillis;
+  private TimeoutInfo timeoutInfo;
   private int pid = -1;
   private static String schedulerName;
 
@@ -75,8 +69,7 @@ public class RemoteInterpreter extends Interpreter {
       String localRepoPath,
       int connectTimeout,
       int maxPoolSize,
-      int closeTimeoutMillis,
-      int waitBetweenKillsMillis,
+      TimeoutInfo timeoutInfo,
       RemoteInterpreterProcessListener remoteInterpreterProcessListener) {
     super(property);
     this.noteId = noteId;
@@ -88,8 +81,7 @@ public class RemoteInterpreter extends Interpreter {
     env = getEnvFromInterpreterProperty(property);
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = maxPoolSize;
-    this.closeTimeoutMillis = closeTimeoutMillis;
-    this.waitBetweeenKillsMillis = waitBetweenKillsMillis;
+    this.timeoutInfo = timeoutInfo;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -118,7 +110,7 @@ public class RemoteInterpreter extends Interpreter {
     this.env = env;
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = 10;
-    this.closeTimeoutMillis = 10000;
+    this.timeoutInfo = new TimeoutInfo();
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -235,7 +227,7 @@ public class RemoteInterpreter extends Interpreter {
           try {
             Client client = process.getClient();
             this.pid = client.getPid();
-          }catch(Exception e) {
+          } catch (Exception e) {
             pid = -1;
           }
         } catch (InterpreterException e) {
@@ -249,41 +241,36 @@ public class RemoteInterpreter extends Interpreter {
 
   @Override
   public void close() {
-    ExecutorService service = Executors.newSingleThreadExecutor();
-    Future future = null;
-    try {
-      future = service.submit(new CloserTask());
-      future.get(closeTimeoutMillis, TimeUnit.MILLISECONDS);
-      return;
-    }catch(InterruptedException | ExecutionException | TimeoutException e) {
-      if(future != null && !future.isDone()) {
+    TimeoutTaskService.doTimeoutTask(new CloserTask(), timeoutInfo.getCloseTimeout(),
+                                     (Future<?> future, Exception e) -> {
+      if (future != null && !future.isDone()) {
         future.cancel(true);
       }
       logger.info("Failed to close interpreter normally, moving to force-kill");
       forceKill(pid);
-    }
+    });
   }
 
   private void forceKill(int pid) {
-    if(pid == -1){
+    if (pid == -1){
       throw new RuntimeException("Failed to identify the pid of interpreter process");
     }
     try {
       Runtime.getRuntime().exec("kill " + pid);
       logger.info("Issuing kill command for process " + pid);
-      sleep(waitBetweeenKillsMillis);
-      if(isProcessTerminated(pid)) {
+      sleep(timeoutInfo.getWaitBetweenKills());
+      if (isProcessTerminated(pid)) {
         return;
       }
       logger.info("Kill command failed. Issuing kill -2 command for process " + pid);
       Runtime.getRuntime().exec("kill -2 " + pid);
-      sleep(waitBetweeenKillsMillis);
-      if(isProcessTerminated(pid)) {
+      sleep(timeoutInfo.getWaitBetweenKills());
+      if (isProcessTerminated(pid)) {
         return;
       }
       logger.warn("Kill -2 command failed. Issuing kill -9 command for process " + pid);
       Runtime.getRuntime().exec("kill -9 " + pid);
-    }catch (Exception e) {
+    } catch (Exception e) {
       throw new RuntimeException("Failed to force-kill the interpreter");
     }
   }
@@ -291,7 +278,7 @@ public class RemoteInterpreter extends Interpreter {
   private void sleep(int ms) {
     try {
       Thread.sleep(ms);
-    }catch(InterruptedException e) {
+    } catch (InterruptedException e) {
       // do nothing
     }
   }
@@ -300,7 +287,7 @@ public class RemoteInterpreter extends Interpreter {
     try {
       int status = Runtime.getRuntime().exec("kill -0 " + pid).waitFor();
       return status == 0;
-    }catch(IOException | InterruptedException e) {
+    } catch (IOException | InterruptedException e) {
       throw new RuntimeException("Failed to force-kill the interpreter");
     }
   }
@@ -318,10 +305,10 @@ public class RemoteInterpreter extends Interpreter {
         if (client != null) {
           client.close(noteId, className);
         }
-      }catch (TException e) {
+      } catch (TException e) {
         broken = true;
         throw new InterpreterException(e);
-      }catch (Exception e1) {
+      } catch (Exception e1) {
         throw new InterpreterException(e1);
       }
       finally {
@@ -338,7 +325,7 @@ public class RemoteInterpreter extends Interpreter {
     logger.debug("st: {}", st);
     FormType form = getFormType();
     RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
-    Client client = null;
+    final Client client;
     try {
       client = interpreterProcess.getClient();
     } catch (Exception e1) {
@@ -357,16 +344,33 @@ public class RemoteInterpreter extends Interpreter {
       interpreterContextRunnerPool.addAll(noteId, runners);
     }
 
+    return TimeoutTaskService.pollingTimeoutTask(
+            () -> doInterpret(client, st, context, interpreterProcess, form),
+            () -> getProgress(context) >= 0,
+            timeoutInfo.getGeneralTimeout(),
+            (Future<InterpreterResult> future, Exception e) ->
+            {
+              future.cancel(true);
+              return new InterpreterResult(InterpreterResult.Code.ERROR,
+                                           Type.TEXT, e.getMessage());
+            });
+  }
+
+  private InterpreterResult doInterpret(Client client,
+                                        String st,
+                                        InterpreterContext context,
+                                        RemoteInterpreterProcess interpreterProcess,
+                                        FormType form)
+  {
     boolean broken = false;
     try {
 
       final GUI currentGUI = context.getGui();
-      RemoteInterpreterResult remoteResult = client.interpret(
-          noteId, className, st, convert(context));
-
+      RemoteInterpreterResult remoteResult = client.interpret(noteId, className,
+                                                              st, convert(context));
       Map<String, Object> remoteConfig = (Map<String, Object>) gson.fromJson(
-          remoteResult.getConfig(), new TypeToken<Map<String, Object>>() {
-          }.getType());
+              remoteResult.getConfig(), new TypeToken<Map<String, Object>>() {
+              }.getType());
       context.getConfig().clear();
       context.getConfig().putAll(remoteConfig);
 
@@ -399,13 +403,22 @@ public class RemoteInterpreter extends Interpreter {
   @Override
   public void cancel(InterpreterContext context) {
     RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
-    Client client = null;
+    final Client client;
     try {
       client = interpreterProcess.getClient();
     } catch (Exception e1) {
       throw new InterpreterException(e1);
     }
+    TimeoutTaskService.doTimeoutTask(
+            () -> doCancel(client, context, interpreterProcess),
+            timeoutInfo.getGeneralTimeout(),
+            (Future<?> future, Exception e) -> {
+              logger.error("Call to cancel timed out. Please restart the interpreter");
+            });
+  }
 
+  private void doCancel(Client client, InterpreterContext context, RemoteInterpreterProcess interpreterProcess)
+  {
     boolean broken = false;
     try {
       client.cancel(noteId, className, convert(context));
@@ -427,17 +440,26 @@ public class RemoteInterpreter extends Interpreter {
     }
 
     RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
-    Client client = null;
+    Client client;
     try {
       client = interpreterProcess.getClient();
     } catch (Exception e1) {
       throw new InterpreterException(e1);
     }
+    return TimeoutTaskService.doTimeoutTask(
+            () -> doGetFormType(client, interpreterProcess),
+            timeoutInfo.getGeneralTimeout(),
+            (Future<FormType> future, Exception e) -> {
+              logger.error("Call to getFormType timed out. Please restart the interpreter");
+              return null;
+            });
+  }
 
+  private FormType doGetFormType(final Client client, RemoteInterpreterProcess interpreterProcess)
+  {
     boolean broken = false;
     try {
-      formType = FormType.valueOf(client.getFormType(noteId, className));
-      return formType;
+      return FormType.valueOf(client.getFormType(noteId, className));
     } catch (TException e) {
       broken = true;
       throw new InterpreterException(e);
@@ -453,13 +475,24 @@ public class RemoteInterpreter extends Interpreter {
       return 0;
     }
 
-    Client client = null;
+    final Client client;
     try {
       client = interpreterProcess.getClient();
     } catch (Exception e1) {
       throw new InterpreterException(e1);
     }
+    return TimeoutTaskService.doTimeoutTask(
+            () -> this.doGetProgress(client, interpreterProcess, context),
+            timeoutInfo.getGeneralTimeout(),
+            (Future<Integer> future, Exception e) -> {
+              logger.error("Call to getProgress timed out. Please restart the interpreter.");
+              return -1;
+            });
+  }
 
+  private int doGetProgress(Client client, RemoteInterpreterProcess interpreterProcess,
+                            InterpreterContext context)
+  {
     boolean broken = false;
     try {
       return client.getProgress(noteId, className, convert(context));
@@ -474,14 +507,28 @@ public class RemoteInterpreter extends Interpreter {
 
   @Override
   public List<InterpreterCompletion> completion(String buf, int cursor) {
+
+
     RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
-    Client client = null;
+    final Client client;
     try {
       client = interpreterProcess.getClient();
     } catch (Exception e1) {
       throw new InterpreterException(e1);
     }
+    return TimeoutTaskService.doTimeoutTask(
+            () -> this.doCompletion(client, interpreterProcess, buf, cursor),
+            timeoutInfo.getGeneralTimeout(),
+            (Future<List<InterpreterCompletion>> future, Exception e) -> {
+              logger.error("Call to completion timed out. Please restart the interpreter.");
+              return Collections.emptyList();
+            });
+  }
 
+
+  private List<InterpreterCompletion> doCompletion(Client client,
+                                                   RemoteInterpreterProcess interpreterProcess,
+                                                   String buf, int cursor) {
     boolean broken = false;
     try {
       List completion = client.completion(noteId, className, buf, cursor);
