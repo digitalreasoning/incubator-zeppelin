@@ -36,8 +36,14 @@ import org.apache.zeppelin.scheduler.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -48,6 +54,8 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public class Paragraph extends Job implements Serializable, Cloneable {
   private static final long serialVersionUID = -6328572073497992016L;
+  private static final String MAX_OUTPUT_KEY = "zeppelin.paragraph.maxOutput";
+  private static final String OVERFLOW_OUTPUT_DIR = "zeppelin.paragraph.outputDir";
 
   private transient NoteInterpreterLoader replLoader;
   private transient Note note;
@@ -294,11 +302,25 @@ public class Paragraph extends Job implements Serializable, Cloneable {
       }
 
       if (message.isEmpty()) {
-        return ret;
+        if (ret.message().length() > getMaxParagraphOutput())
+        {
+          String filename = createTempFile(ret.message());
+          String tooLongMessage = createTooLongMessage(filename);
+          return new InterpreterResult(ret.code(), ret.type(), tooLongMessage);
+        }
+        else
+        {
+          return ret;
+        }
       } else {
         String interpreterResultMessage = ret.message();
         if (interpreterResultMessage != null && !interpreterResultMessage.isEmpty()) {
           message += interpreterResultMessage;
+          if (message.length() > getMaxParagraphOutput())
+          {
+            String filename = createTempFile(message);
+            message = createTooLongMessage(filename);
+          }
           return new InterpreterResult(ret.code(), ret.type(), message);
         } else {
           return new InterpreterResult(ret.code(), outputType, message);
@@ -308,6 +330,50 @@ public class Paragraph extends Job implements Serializable, Cloneable {
       InterpreterContext.remove();
       effectiveText = null;
     }
+  }
+
+  private int getMaxParagraphOutput()
+  {
+    return replLoader.getZeppelinConfiguration().getInt(MAX_OUTPUT_KEY, 500000);
+  }
+
+  private Path getParagraphOverflowOutputDir()
+  {
+    String configuredValue = replLoader.getZeppelinConfiguration()
+                                       .getString(OVERFLOW_OUTPUT_DIR, "");
+    Path path = Paths.get(configuredValue);
+    if (!Files.exists(path) || !Files.isDirectory(path))
+    {
+      throw new IllegalArgumentException("No directory named " + path.toString() +
+                                         " found. Please check your configuration");
+    }
+    return path;
+  }
+
+  private String createFileName()
+  {
+    long timestamp = System.currentTimeMillis();
+    return getParagraphOverflowOutputDir().resolve("paragraph-output-" + timestamp).toString();
+  }
+
+  private String createTempFile(String message)
+  {
+    File file = new File(createFileName());
+    file.deleteOnExit();
+    try (FileOutputStream out = new FileOutputStream(file))
+    {
+      out.write(message.getBytes(StandardCharsets.UTF_8));
+    }
+    catch (IOException e)
+    {
+      throw new RuntimeException("Failed to write paragraph output to file", e);
+    }
+    return file.getAbsolutePath();
+  }
+
+  private String createTooLongMessage(String filename)
+  {
+    return "Output too large. Check the file '" + filename + "' for full paragraph output";
   }
 
   @Override
