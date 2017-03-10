@@ -337,32 +337,25 @@ public class Paragraph extends Job implements Serializable, Cloneable {
     return replLoader.getZeppelinConfiguration().getInt(MAX_OUTPUT_KEY, 500000);
   }
 
-  private Path getParagraphOverflowOutputDir()
-  {
-    String configuredValue = replLoader.getZeppelinConfiguration()
-                                       .getString(OVERFLOW_OUTPUT_DIR, "");
-    Path path = Paths.get(configuredValue);
-    if (!Files.exists(path) || !Files.isDirectory(path))
-    {
-      throw new IllegalArgumentException("No directory named " + path.toString() +
-                                         " found. Please check your configuration");
-    }
-    return path;
-  }
-
-  private String createFileName()
-  {
-    long timestamp = System.currentTimeMillis();
-    return getParagraphOverflowOutputDir().resolve("paragraph-output-" + timestamp).toString();
-  }
 
   private String createTempFile(String message)
   {
-    File file = new File(createFileName());
-    file.deleteOnExit();
-    try (FileOutputStream out = new FileOutputStream(file))
+    String configuredValue = replLoader.getZeppelinConfiguration()
+                                       .getString(OVERFLOW_OUTPUT_DIR, System.getenv("TMPDIR"));
+    File file;
+    try
     {
+      Path path = Paths.get(configuredValue);
+      if (!Files.exists(path) || !Files.isDirectory(path))
+      {
+        throw new IllegalArgumentException("No directory named " + path.toString() +
+                                           " found. Please check your configuration");
+      }
+      file = path.resolve("paragraph-output-" + System.currentTimeMillis()).toFile();
+      file.deleteOnExit();
+      FileOutputStream out = new FileOutputStream(file);
       out.write(message.getBytes(StandardCharsets.UTF_8));
+      out.close();
     }
     catch (IOException e)
     {
