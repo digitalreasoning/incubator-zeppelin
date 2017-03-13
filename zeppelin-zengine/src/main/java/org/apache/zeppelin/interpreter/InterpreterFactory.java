@@ -905,7 +905,7 @@ public class InterpreterFactory implements InterpreterGroupFactory {
     info.setCloseTimeout(conf.getInt("zeppelin.interpreter.closeTimeoutMillis", (1000 * 10)));
     info.setWaitBetweenKills(
             conf.getInt("zeppelin.interpreter.waitBetweenKillsMillis", (1000 * 5)));
-    info.setGeneralTimeout(conf.getInt("zeppelin.interpreter.timeoutMillis", -1));
+    info.setGeneralTimeout(conf.getInt("zeppelin.interpreter.timeoutMillis", 1000 * 10));
     return info;
   }
 
