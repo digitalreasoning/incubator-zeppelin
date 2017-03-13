@@ -340,28 +340,29 @@ public class Paragraph extends Job implements Serializable, Cloneable {
 
   private String createTempFile(String message)
   {
-    String configuredValue = replLoader.getZeppelinConfiguration()
-                                       .getString(OVERFLOW_OUTPUT_DIR, System.getenv("TMPDIR"));
-    File file;
+    String configuredValue =
+            replLoader.getZeppelinConfiguration()
+                      .getString(OVERFLOW_OUTPUT_DIR, System.getProperty("java.io.tmpdir"));
     try
     {
-      Path path = Paths.get(configuredValue);
-      if (!Files.exists(path) || !Files.isDirectory(path))
+      Path outputDir = Paths.get(configuredValue);
+      if (!Files.exists(outputDir) || !Files.isDirectory(outputDir))
       {
-        throw new IllegalArgumentException("No directory named " + path.toString() +
+        throw new IllegalArgumentException("No directory named " + outputDir.toString() +
                                            " found. Please check your configuration");
       }
-      file = path.resolve("paragraph-output-" + System.currentTimeMillis()).toFile();
-      file.deleteOnExit();
-      FileOutputStream out = new FileOutputStream(file);
-      out.write(message.getBytes(StandardCharsets.UTF_8));
-      out.close();
+      outputDir = outputDir.resolve("paragraph-output");
+      outputDir.toFile().mkdir();
+      outputDir.toFile().deleteOnExit();
+      Path outputFile = outputDir.resolve("output-" + System.currentTimeMillis());
+      outputFile.toFile().deleteOnExit();
+      Files.write(outputFile, message.getBytes(StandardCharsets.UTF_8));
+      return outputFile.toAbsolutePath().toString();
     }
     catch (IOException e)
     {
       throw new RuntimeException("Failed to write paragraph output to file", e);
     }
-    return file.getAbsolutePath();
   }
 
   private String createTooLongMessage(String filename)
