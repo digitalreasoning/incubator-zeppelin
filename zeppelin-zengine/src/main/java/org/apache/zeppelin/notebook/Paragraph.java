@@ -23,7 +23,6 @@ import org.apache.zeppelin.interpreter.thrift.InterpreterCompletion;
 import org.apache.zeppelin.user.AuthenticationInfo;
 import org.apache.zeppelin.user.Credentials;
 import org.apache.zeppelin.user.UserCredentials;
-import org.apache.zeppelin.user.UsernamePassword;
 import org.apache.zeppelin.display.GUI;
 import org.apache.zeppelin.display.Input;
 import org.apache.zeppelin.interpreter.*;
@@ -36,8 +35,6 @@ import org.apache.zeppelin.scheduler.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
@@ -55,7 +52,8 @@ import com.google.common.annotations.VisibleForTesting;
 public class Paragraph extends Job implements Serializable, Cloneable {
   private static final long serialVersionUID = -6328572073497992016L;
   private static final String MAX_OUTPUT_KEY = "zeppelin.paragraph.maxOutput";
-  private static final String OVERFLOW_OUTPUT_DIR = "zeppelin.paragraph.outputDir";
+  private static final String OVERFLOW_OUTPUT_DIR_KEY = "zeppelin.paragraph.outputDir";
+  private static final String PARAGRAPH_OUTPUT_DIR = "notebook-" + System.currentTimeMillis();
 
   private transient NoteInterpreterLoader replLoader;
   private transient Note note;
@@ -342,19 +340,11 @@ public class Paragraph extends Job implements Serializable, Cloneable {
   {
     String configuredValue =
             replLoader.getZeppelinConfiguration()
-                      .getString(OVERFLOW_OUTPUT_DIR, System.getProperty("java.io.tmpdir"));
+                      .getString(OVERFLOW_OUTPUT_DIR_KEY, System.getProperty("java.io.tmpdir"));
     try
     {
-      Path outputDir = Paths.get(configuredValue);
-      if (!Files.exists(outputDir) || !Files.isDirectory(outputDir))
-      {
-        throw new IllegalArgumentException("No directory named " + outputDir.toString() +
-                                           " found. Please check your configuration");
-      }
-      outputDir = outputDir.resolve("paragraph-output");
-      outputDir.toFile().mkdir();
-      outputDir.toFile().deleteOnExit();
-      Path outputFile = outputDir.resolve("output-" + System.currentTimeMillis());
+      Path outputDir = getOutputDir(configuredValue);
+      Path outputFile = outputDir.resolve("paragraph-output-" + System.currentTimeMillis());
       outputFile.toFile().deleteOnExit();
       Files.write(outputFile, message.getBytes(StandardCharsets.UTF_8));
       return outputFile.toAbsolutePath().toString();
@@ -363,6 +353,23 @@ public class Paragraph extends Job implements Serializable, Cloneable {
     {
       throw new RuntimeException("Failed to write paragraph output to file", e);
     }
+  }
+
+  private Path getOutputDir(String configuredValue)
+  {
+    Path outputDir = Paths.get(configuredValue);
+    if (!Files.exists(outputDir) || !Files.isDirectory(outputDir))
+    {
+      throw new IllegalArgumentException("No directory named " + outputDir.toString() +
+                                         " found. Please check your configuration");
+    }
+    outputDir = outputDir.resolve(PARAGRAPH_OUTPUT_DIR);
+    if (Files.notExists(outputDir))
+    {
+      outputDir.toFile().mkdir();
+      outputDir.toFile().deleteOnExit();
+    }
+    return outputDir;
   }
 
   private String createTooLongMessage(String filename)
