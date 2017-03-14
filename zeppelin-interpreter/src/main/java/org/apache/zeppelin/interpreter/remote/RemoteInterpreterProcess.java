@@ -129,7 +129,9 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
           }
           ;
           CommandLine cmdLine = new CommandLine(interpreterRunner);
-          cmdLine.addArguments(interpreterGroup.getProperty().getProperty("synthesys.notebook.interpreter.args", "--max-heap 1g"));
+          cmdLine.addArguments(interpreterGroup.getProperty()
+                       .getProperty("synthesys.notebook.interpreter.args", "--max-heap 1g")
+          );
           cmdLine.addArgument(Integer.toString(port), false);
 
           executor = new DefaultExecutor();
@@ -170,7 +172,8 @@ public class RemoteInterpreterProcess implements ExecuteResultHandler {
         final ClassLoader old = Thread.currentThread().getContextClassLoader();
         try
         {
-          Thread.currentThread().setContextClassLoader(RemoteInterpreterProcess.class.getClassLoader());
+          Thread.currentThread()
+                .setContextClassLoader(RemoteInterpreterProcess.class.getClassLoader());
           clientPool = new GenericObjectPool<Client>(new ClientFactory(host, port));
         }
         finally {
