@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.zeppelin.conf.ZeppelinConfiguration;
 import org.apache.zeppelin.interpreter.Constants;
 import org.apache.zeppelin.interpreter.Interpreter;
 import org.apache.zeppelin.interpreter.Interpreter.RegisteredInterpreter;
@@ -130,9 +131,10 @@ public class NoteInterpreterLoader {
     Interpreter.RegisteredInterpreter interpreter = null;
 
 
-    for(Interpreter.RegisteredInterpreter registeredInterpreter : Interpreter.registeredInterpreters.values())
+    for (Interpreter.RegisteredInterpreter registeredInterpreter :
+            Interpreter.registeredInterpreters.values())
     {
-      if(registeredInterpreter.getName().equals(replName))
+      if (registeredInterpreter.getName().equals(replName))
       {
         interpreter = registeredInterpreter;
         break;
@@ -157,5 +159,10 @@ public class NoteInterpreterLoader {
       }
     }
     throw new InterpreterException(replName + " interpreter not found");
+  }
+
+  public ZeppelinConfiguration getZeppelinConfiguration()
+  {
+    return factory.getZeppelinConfiguration();
   }
 }

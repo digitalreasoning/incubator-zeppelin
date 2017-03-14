@@ -23,7 +23,6 @@ import org.apache.zeppelin.interpreter.thrift.InterpreterCompletion;
 import org.apache.zeppelin.user.AuthenticationInfo;
 import org.apache.zeppelin.user.Credentials;
 import org.apache.zeppelin.user.UserCredentials;
-import org.apache.zeppelin.user.UsernamePassword;
 import org.apache.zeppelin.display.GUI;
 import org.apache.zeppelin.display.Input;
 import org.apache.zeppelin.interpreter.*;
@@ -38,6 +37,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -48,6 +51,9 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public class Paragraph extends Job implements Serializable, Cloneable {
   private static final long serialVersionUID = -6328572073497992016L;
+  private static final String MAX_OUTPUT_KEY = "zeppelin.paragraph.maxOutput";
+  private static final String OVERFLOW_OUTPUT_DIR_KEY = "zeppelin.paragraph.outputDir";
+  private static final String PARAGRAPH_OUTPUT_DIR = "notebook-" + System.currentTimeMillis();
 
   private transient NoteInterpreterLoader replLoader;
   private transient Note note;
@@ -294,11 +300,25 @@ public class Paragraph extends Job implements Serializable, Cloneable {
       }
 
       if (message.isEmpty()) {
-        return ret;
+        if (ret.message().length() > getMaxParagraphOutput())
+        {
+          String filename = createTempFile(ret.message());
+          String tooLongMessage = createTooLongMessage(filename);
+          return new InterpreterResult(ret.code(), ret.type(), tooLongMessage);
+        }
+        else
+        {
+          return ret;
+        }
       } else {
         String interpreterResultMessage = ret.message();
         if (interpreterResultMessage != null && !interpreterResultMessage.isEmpty()) {
           message += interpreterResultMessage;
+          if (message.length() > getMaxParagraphOutput())
+          {
+            String filename = createTempFile(message);
+            message = createTooLongMessage(filename);
+          }
           return new InterpreterResult(ret.code(), ret.type(), message);
         } else {
           return new InterpreterResult(ret.code(), outputType, message);
@@ -308,6 +328,53 @@ public class Paragraph extends Job implements Serializable, Cloneable {
       InterpreterContext.remove();
       effectiveText = null;
     }
+  }
+
+  private int getMaxParagraphOutput()
+  {
+    return replLoader.getZeppelinConfiguration().getInt(MAX_OUTPUT_KEY, 500000);
+  }
+
+
+  private String createTempFile(String message)
+  {
+    String configuredValue =
+            replLoader.getZeppelinConfiguration()
+                      .getString(OVERFLOW_OUTPUT_DIR_KEY, System.getProperty("java.io.tmpdir"));
+    try
+    {
+      Path outputDir = getOutputDir(configuredValue);
+      Path outputFile = outputDir.resolve("paragraph-output-" + System.currentTimeMillis());
+      outputFile.toFile().deleteOnExit();
+      Files.write(outputFile, message.getBytes(StandardCharsets.UTF_8));
+      return outputFile.toAbsolutePath().toString();
+    }
+    catch (IOException e)
+    {
+      throw new RuntimeException("Failed to write paragraph output to file", e);
+    }
+  }
+
+  private Path getOutputDir(String configuredValue)
+  {
+    Path outputDir = Paths.get(configuredValue);
+    if (!Files.exists(outputDir) || !Files.isDirectory(outputDir))
+    {
+      throw new IllegalArgumentException("No directory named " + outputDir.toString() +
+                                         " found. Please check your configuration");
+    }
+    outputDir = outputDir.resolve(PARAGRAPH_OUTPUT_DIR);
+    if (Files.notExists(outputDir))
+    {
+      outputDir.toFile().mkdir();
+      outputDir.toFile().deleteOnExit();
+    }
+    return outputDir;
+  }
+
+  private String createTooLongMessage(String filename)
+  {
+    return "Output too large. Check the file '" + filename + "' for full paragraph output";
   }
 
   @Override

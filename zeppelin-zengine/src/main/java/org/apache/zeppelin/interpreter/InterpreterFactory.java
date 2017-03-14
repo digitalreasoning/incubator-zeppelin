@@ -55,7 +55,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.StreamSupport;
 
 /**
  * Manage interpreters.
@@ -931,5 +930,10 @@ public class InterpreterFactory implements InterpreterGroupFactory {
   public void removeRepository(String id) throws IOException {
     depResolver.delRepo(id);
     saveToFile();
+  }
+
+  public ZeppelinConfiguration getZeppelinConfiguration()
+  {
+    return this.conf;
   }
 }
