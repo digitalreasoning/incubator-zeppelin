@@ -33,8 +33,8 @@ import org.apache.zeppelin.display.AngularObjectRegistryListener;
 import org.apache.zeppelin.interpreter.Interpreter.RegisteredInterpreter;
 import org.apache.zeppelin.interpreter.remote.RemoteAngularObjectRegistry;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreter;
+import org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterProcessListener;
-import org.apache.zeppelin.notebook.NoteInterpreterLoader;
 import org.apache.zeppelin.scheduler.Job;
 import org.apache.zeppelin.scheduler.Job.Status;
 import org.slf4j.Logger;
@@ -55,6 +55,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+
+import static org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig.*;
 
 /**
  * Manage interpreters.
@@ -886,15 +888,21 @@ public class InterpreterFactory implements InterpreterGroupFactory {
 
   private Interpreter createRemoteRepl(String interpreterPath, String noteId, String className,
       Properties property, String interpreterSettingId) {
-    int connectTimeout = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT);
-    String localRepoPath = conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId;
-    int maxPoolSize = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE);
-    int closeTimeoutMillis = conf.getInt("zeppelin.interpreter.closeTimeoutMillis", (1000 * 10));
-    int waitBetweenKillsMillis = conf.getInt("zeppelin.interpreter.waitBetweenKillsMillis", (1000 * 5));
-    LazyOpenInterpreter intp = new LazyOpenInterpreter(new RemoteInterpreter(
-        property, noteId, className, conf.getInterpreterRemoteRunnerPath(),
-        interpreterPath, localRepoPath, connectTimeout,
-        maxPoolSize, closeTimeoutMillis, waitBetweenKillsMillis, remoteInterpreterProcessListener));
+    RemoteInterpreterConfig config = new RemoteInterpreterConfig();
+    config.setClassName(className);
+    config.setNoteId(noteId);
+    config.setInterpreterPath(interpreterPath);
+    config.setInterpreterRunner(conf.getInterpreterRemoteRunnerPath());
+    config.setConnectTimeout(conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT));
+    config.setLocalRepoPath(conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId);
+    config.setMaxPoolSize(conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE));
+    config.setCloseTimeoutMillis(conf.getInt(CLOSE_TIMEOUT_KEY, (1000 * 10)));
+    config.setWaitBetweenKillsMillis(conf.getInt(WAIT_BETWEEN_KILLS_KEY, (1000 * 5)));
+    config.setMaxParagraphOutput(conf.getInt(PARAGRAPH_MAX_OUTPUT_KEY, 500000));
+    config.setParagraphOutputDir(conf.getString(PARAGRAPH_OUTPUT_DIR_KEY,
+                                                System.getProperty("java.io.tmpdir")));
+    LazyOpenInterpreter intp = new LazyOpenInterpreter(
+            new RemoteInterpreter(config, property, remoteInterpreterProcessListener));
     return intp;
   }
 

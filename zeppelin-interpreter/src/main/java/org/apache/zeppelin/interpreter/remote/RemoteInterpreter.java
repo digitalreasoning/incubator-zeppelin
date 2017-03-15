@@ -18,6 +18,7 @@
 package org.apache.zeppelin.interpreter.remote;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -45,6 +46,8 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import static org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig.*;
+
 /**
  * Proxy for Interpreter instance that runs on separate process
  */
@@ -63,9 +66,29 @@ public class RemoteInterpreter extends Interpreter {
   private int connectTimeout;
   private int maxPoolSize;
   private int closeTimeoutMillis;
-  private int waitBetweeenKillsMillis;
+  private int waitBetweenKillsMillis;
   private int pid = -1;
   private static String schedulerName;
+
+  public RemoteInterpreter(RemoteInterpreterConfig config,
+                           Properties property,
+                           RemoteInterpreterProcessListener remoteInterpreterProcessListener) {
+    this(property,
+         config.getNoteId(),
+         config.getClassName(),
+         config.getInterpreterRunner(),
+         config.getInterpreterPath(),
+         config.getLocalRepoPath(),
+         config.getConnectTimeout(),
+         config.getMaxPoolSize(),
+         config.getCloseTimeoutMillis(),
+         config.getWaitBetweenKillsMillis(),
+         remoteInterpreterProcessListener);
+    env.put(PARAGRAPH_MAX_OUTPUT_KEY, "" + config.getMaxParagraphOutput());
+    env.put(PARAGRAPH_OUTPUT_DIR_KEY, Paths.get(config.getParagraphOutputDir())
+                                           .resolve("notebook-" + System.currentTimeMillis())
+                                           .toAbsolutePath().toString());
+  }
 
   public RemoteInterpreter(Properties property,
       String noteId,
@@ -89,7 +112,7 @@ public class RemoteInterpreter extends Interpreter {
     this.connectTimeout = connectTimeout;
     this.maxPoolSize = maxPoolSize;
     this.closeTimeoutMillis = closeTimeoutMillis;
-    this.waitBetweeenKillsMillis = waitBetweenKillsMillis;
+    this.waitBetweenKillsMillis = waitBetweenKillsMillis;
     this.remoteInterpreterProcessListener = remoteInterpreterProcessListener;
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
@@ -271,13 +294,13 @@ public class RemoteInterpreter extends Interpreter {
     try {
       Runtime.getRuntime().exec("kill " + pid);
       logger.info("Issuing kill command for process " + pid);
-      sleep(waitBetweeenKillsMillis);
+      sleep(waitBetweenKillsMillis);
       if(isProcessTerminated(pid)) {
         return;
       }
       logger.info("Kill command failed. Issuing kill -2 command for process " + pid);
       Runtime.getRuntime().exec("kill -2 " + pid);
-      sleep(waitBetweeenKillsMillis);
+      sleep(waitBetweenKillsMillis);
       if(isProcessTerminated(pid)) {
         return;
       }
