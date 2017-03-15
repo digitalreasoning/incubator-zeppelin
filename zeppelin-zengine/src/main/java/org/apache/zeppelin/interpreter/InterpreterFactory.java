@@ -35,6 +35,7 @@ import org.apache.zeppelin.interpreter.remote.RemoteAngularObjectRegistry;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreter;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterProcessListener;
+import org.apache.zeppelin.interpreter.remote.TimeoutInfo;
 import org.apache.zeppelin.scheduler.Job;
 import org.apache.zeppelin.scheduler.Job.Status;
 import org.slf4j.Logger;
@@ -825,6 +826,7 @@ public class InterpreterFactory implements InterpreterGroupFactory {
         logger.error("Can't close interpreterGroup", e);
       }
     }
+    clearOutputDirectory();
   }
 
   private Interpreter createRepl(String dirName, String className,
@@ -898,21 +900,43 @@ public class InterpreterFactory implements InterpreterGroupFactory {
     config.setConnectTimeout(conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT));
     config.setLocalRepoPath(conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId);
     config.setMaxPoolSize(conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE));
-    config.setCloseTimeoutMillis(conf.getInt(CLOSE_TIMEOUT_KEY, (1000 * 10)));
-    config.setWaitBetweenKillsMillis(conf.getInt(WAIT_BETWEEN_KILLS_KEY, (1000 * 5)));
+    config.setTimeoutInfo(createTimeoutInfo());
     config.setMaxParagraphOutput(conf.getInt(PARAGRAPH_MAX_OUTPUT_KEY, 500000));
-    config.setParagraphOutputDir(getOutputDirectory(conf));
+    config.setParagraphOutputDir(getOutputDirectory());
     LazyOpenInterpreter intp = new LazyOpenInterpreter(
             new RemoteInterpreter(config, property, remoteInterpreterProcessListener));
     return intp;
   }
 
-  private String getOutputDirectory(ZeppelinConfiguration conf)
+  private String getOutputDirectory()
   {
     return Paths.get(
             conf.getString(PARAGRAPH_OUTPUT_DIR_KEY, System.getProperty("java.io.tmpdir")))
                 .resolve(NOTEBOOK_DIRECTORY)
                 .toAbsolutePath().toString();
+  }
+
+  private void clearOutputDirectory()
+  {
+    File outputDirectory = new File(getOutputDirectory());
+    if(outputDirectory.exists() && outputDirectory.isDirectory())
+    {
+      for(File f : outputDirectory.listFiles())
+      {
+        f.delete();
+      }
+    }
+    outputDirectory.delete();
+  }
+
+  private TimeoutInfo createTimeoutInfo()
+  {
+    TimeoutInfo info = new TimeoutInfo();
+    info.setCloseTimeout(conf.getInt("zeppelin.interpreter.closeTimeoutMillis", (1000 * 10)));
+    info.setWaitBetweenKills(
+            conf.getInt("zeppelin.interpreter.waitBetweenKillsMillis", (1000 * 5)));
+    info.setGeneralTimeout(conf.getInt("zeppelin.interpreter.timeoutMillis", 1000 * 10));
+    return info;
   }
 
   private URL[] recursiveBuildLibList(File path) throws MalformedURLException {

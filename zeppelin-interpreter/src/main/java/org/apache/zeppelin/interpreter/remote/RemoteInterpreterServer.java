@@ -396,7 +396,6 @@ public class RemoteInterpreterServer
       {
         Path outputDir = getOutputDir(configuredValue);
         Path outputFile = outputDir.resolve("paragraph-output-" + System.currentTimeMillis());
-        outputFile.toFile().deleteOnExit();
         Files.write(outputFile, message.getBytes(StandardCharsets.UTF_8));
         return outputFile.toAbsolutePath().toString();
       }
@@ -418,7 +417,6 @@ public class RemoteInterpreterServer
       if (Files.notExists(outputDir))
       {
         outputDir.toFile().mkdir();
-        outputDir.toFile().deleteOnExit();
       }
       return outputDir;
     }

@@ -36,8 +36,7 @@ public class RemoteInterpreterConfig
   private String paragraphOutputDir;
   private int connectTimeout;
   private int maxPoolSize;
-  private int closeTimeoutMillis;
-  private int waitBetweenKillsMillis;
+  private TimeoutInfo timeoutInfo;
   private int maxParagraphOutput;
 
   public RemoteInterpreterConfig()
@@ -115,24 +114,14 @@ public class RemoteInterpreterConfig
     this.maxPoolSize = maxPoolSize;
   }
 
-  public int getCloseTimeoutMillis()
+  public TimeoutInfo getTimeoutInfo()
   {
-    return closeTimeoutMillis;
+    return timeoutInfo;
   }
 
-  public void setCloseTimeoutMillis(final int closeTimeoutMillis)
+  public void setTimeoutInfo(final TimeoutInfo timeoutInfo)
   {
-    this.closeTimeoutMillis = closeTimeoutMillis;
-  }
-
-  public int getWaitBetweenKillsMillis()
-  {
-    return waitBetweenKillsMillis;
-  }
-
-  public void setWaitBetweenKillsMillis(final int waitBetweenKillsMillis)
-  {
-    this.waitBetweenKillsMillis = waitBetweenKillsMillis;
+    this.timeoutInfo = timeoutInfo;
   }
 
   public String getParagraphOutputDir()
