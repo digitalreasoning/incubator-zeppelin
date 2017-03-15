@@ -64,6 +64,8 @@ import static org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig.*;
 public class InterpreterFactory implements InterpreterGroupFactory {
   Logger logger = LoggerFactory.getLogger(InterpreterFactory.class);
 
+  private static final String NOTEBOOK_DIRECTORY = "notebook-" + System.currentTimeMillis();
+
   private Map<String, URLClassLoader> cleanCl = Collections
       .synchronizedMap(new HashMap<String, URLClassLoader>());
 
@@ -899,11 +901,18 @@ public class InterpreterFactory implements InterpreterGroupFactory {
     config.setCloseTimeoutMillis(conf.getInt(CLOSE_TIMEOUT_KEY, (1000 * 10)));
     config.setWaitBetweenKillsMillis(conf.getInt(WAIT_BETWEEN_KILLS_KEY, (1000 * 5)));
     config.setMaxParagraphOutput(conf.getInt(PARAGRAPH_MAX_OUTPUT_KEY, 500000));
-    config.setParagraphOutputDir(conf.getString(PARAGRAPH_OUTPUT_DIR_KEY,
-                                                System.getProperty("java.io.tmpdir")));
+    config.setParagraphOutputDir(getOutputDirectory(conf));
     LazyOpenInterpreter intp = new LazyOpenInterpreter(
             new RemoteInterpreter(config, property, remoteInterpreterProcessListener));
     return intp;
+  }
+
+  private String getOutputDirectory(ZeppelinConfiguration conf)
+  {
+    return Paths.get(
+            conf.getString(PARAGRAPH_OUTPUT_DIR_KEY, System.getProperty("java.io.tmpdir")))
+                .resolve(NOTEBOOK_DIRECTORY)
+                .toAbsolutePath().toString();
   }
 
   private URL[] recursiveBuildLibList(File path) throws MalformedURLException {

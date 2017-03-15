@@ -85,9 +85,7 @@ public class RemoteInterpreter extends Interpreter {
          config.getWaitBetweenKillsMillis(),
          remoteInterpreterProcessListener);
     env.put(PARAGRAPH_MAX_OUTPUT_KEY, "" + config.getMaxParagraphOutput());
-    env.put(PARAGRAPH_OUTPUT_DIR_KEY, Paths.get(config.getParagraphOutputDir())
-                                           .resolve("notebook-" + System.currentTimeMillis())
-                                           .toAbsolutePath().toString());
+    env.put(PARAGRAPH_OUTPUT_DIR_KEY, config.getParagraphOutputDir());
   }
 
   public RemoteInterpreter(Properties property,

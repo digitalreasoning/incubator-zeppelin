@@ -406,12 +406,12 @@ public class RemoteInterpreterServer
       }
     }
 
-    private Path getOutputDir(String configuredValue)
+    private Path getOutputDir(String configuredValue) throws IOException
     {
       Path outputDir = Paths.get(configuredValue);
       if (Files.notExists(outputDir.getParent()))
       {
-        throw new IllegalArgumentException("No directory named "
+        throw new IOException("No directory named "
                                            + outputDir.getParent().toAbsolutePath().toString()
                                            + " found");
       }
