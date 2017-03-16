@@ -18,6 +18,7 @@
 package org.apache.zeppelin.interpreter.remote;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Future;
 
@@ -40,6 +41,8 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import static org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig.*;
+
 /**
  * Proxy for Interpreter instance that runs on separate process
  */
@@ -60,6 +63,23 @@ public class RemoteInterpreter extends Interpreter {
   private TimeoutInfo timeoutInfo;
   private int pid = -1;
   private static String schedulerName;
+
+  public RemoteInterpreter(RemoteInterpreterConfig config,
+                           Properties property,
+                           RemoteInterpreterProcessListener remoteInterpreterProcessListener) {
+    this(property,
+         config.getNoteId(),
+         config.getClassName(),
+         config.getInterpreterRunner(),
+         config.getInterpreterPath(),
+         config.getLocalRepoPath(),
+         config.getConnectTimeout(),
+         config.getMaxPoolSize(),
+         config.getTimeoutInfo(),
+         remoteInterpreterProcessListener);
+    env.put(PARAGRAPH_MAX_OUTPUT_KEY, "" + config.getMaxParagraphOutput());
+    env.put(PARAGRAPH_OUTPUT_DIR_KEY, config.getParagraphOutputDir());
+  }
 
   public RemoteInterpreter(Properties property,
       String noteId,

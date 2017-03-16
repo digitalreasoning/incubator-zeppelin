@@ -23,6 +23,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 import org.apache.thrift.TException;
@@ -47,6 +51,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import static org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig.*;
 
 /**
  * Entry point for Interpreter process.
@@ -355,14 +360,22 @@ public class RemoteInterpreterServer
         }
 
         String interpreterResultMessage = result.message();
+        InterpreterResult.Type resultType;
 
-        InterpreterResult combinedResult;
         if (interpreterResultMessage != null && !interpreterResultMessage.isEmpty()) {
           message += interpreterResultMessage;
-          combinedResult = new InterpreterResult(result.code(), result.type(), message);
+          resultType = result.type();
         } else {
-          combinedResult = new InterpreterResult(result.code(), outputType, message);
+          resultType = outputType;
         }
+
+        if (message.length() > getMaxParagraphOutput())
+        {
+          String filename = createTempFile(message);
+          message = "Output too large. Check the file '" + filename + "' for full paragraph output";
+        }
+
+        InterpreterResult combinedResult = new InterpreterResult(result.code(), resultType, message);
 
         // put result into resource pool
         context.getResourcePool().put(
@@ -374,6 +387,43 @@ public class RemoteInterpreterServer
       } finally {
         InterpreterContext.remove();
       }
+    }
+
+    private String createTempFile(String message)
+    {
+      String configuredValue = System.getenv(PARAGRAPH_OUTPUT_DIR_KEY);
+      try
+      {
+        Path outputDir = getOutputDir(configuredValue);
+        Path outputFile = outputDir.resolve("paragraph-output-" + System.currentTimeMillis());
+        Files.write(outputFile, message.getBytes(StandardCharsets.UTF_8));
+        return outputFile.toAbsolutePath().toString();
+      }
+      catch (IOException e)
+      {
+        throw new RuntimeException("Failed to write paragraph output to file", e);
+      }
+    }
+
+    private Path getOutputDir(String configuredValue) throws IOException
+    {
+      Path outputDir = Paths.get(configuredValue);
+      if (Files.notExists(outputDir.getParent()))
+      {
+        throw new IOException("No directory named "
+                                           + outputDir.getParent().toAbsolutePath().toString()
+                                           + " found");
+      }
+      if (Files.notExists(outputDir))
+      {
+        outputDir.toFile().mkdir();
+      }
+      return outputDir;
+    }
+
+    private int getMaxParagraphOutput()
+    {
+      return Integer.parseInt(System.getenv(PARAGRAPH_MAX_OUTPUT_KEY));
     }
 
     @Override
