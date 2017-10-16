@@ -34,7 +34,6 @@ import org.apache.zeppelin.interpreter.Interpreter.RegisteredInterpreter;
 import org.apache.zeppelin.interpreter.remote.RemoteAngularObjectRegistry;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreter;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterProcessListener;
-import org.apache.zeppelin.interpreter.remote.TimeoutInfo;
 import org.apache.zeppelin.notebook.NoteInterpreterLoader;
 import org.apache.zeppelin.scheduler.Job;
 import org.apache.zeppelin.scheduler.Job.Status;
@@ -890,22 +889,13 @@ public class InterpreterFactory implements InterpreterGroupFactory {
     int connectTimeout = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT);
     String localRepoPath = conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId;
     int maxPoolSize = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE);
-    TimeoutInfo timeoutInfo = createTimeoutInfo();
+    int closeTimeoutMillis = conf.getInt("zeppelin.interpreter.closeTimeoutMillis", (1000 * 10));
+    int waitBetweenKillsMillis = conf.getInt("zeppelin.interpreter.waitBetweenKillsMillis", (1000 * 5));
     LazyOpenInterpreter intp = new LazyOpenInterpreter(new RemoteInterpreter(
         property, noteId, className, conf.getInterpreterRemoteRunnerPath(),
         interpreterPath, localRepoPath, connectTimeout,
-        maxPoolSize, timeoutInfo, remoteInterpreterProcessListener));
+        maxPoolSize, closeTimeoutMillis, waitBetweenKillsMillis, remoteInterpreterProcessListener));
     return intp;
-  }
-
-  private TimeoutInfo createTimeoutInfo()
-  {
-    TimeoutInfo info = new TimeoutInfo();
-    info.setCloseTimeout(conf.getInt("zeppelin.interpreter.closeTimeoutMillis", (1000 * 10)));
-    info.setWaitBetweenKills(
-            conf.getInt("zeppelin.interpreter.waitBetweenKillsMillis", (1000 * 5)));
-    info.setGeneralTimeout(conf.getInt("zeppelin.interpreter.timeoutMillis", 1000 * 10));
-    return info;
   }
 
   private URL[] recursiveBuildLibList(File path) throws MalformedURLException {
