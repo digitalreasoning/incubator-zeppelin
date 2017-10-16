@@ -33,9 +33,9 @@ import org.apache.zeppelin.display.AngularObjectRegistryListener;
 import org.apache.zeppelin.interpreter.Interpreter.RegisteredInterpreter;
 import org.apache.zeppelin.interpreter.remote.RemoteAngularObjectRegistry;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreter;
-import org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterProcessListener;
 import org.apache.zeppelin.interpreter.remote.TimeoutInfo;
+import org.apache.zeppelin.notebook.NoteInterpreterLoader;
 import org.apache.zeppelin.scheduler.Job;
 import org.apache.zeppelin.scheduler.Job.Status;
 import org.slf4j.Logger;
@@ -57,15 +57,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static org.apache.zeppelin.interpreter.remote.RemoteInterpreterConfig.*;
-
 /**
  * Manage interpreters.
  */
 public class InterpreterFactory implements InterpreterGroupFactory {
   Logger logger = LoggerFactory.getLogger(InterpreterFactory.class);
-
-  private static final String NOTEBOOK_DIRECTORY = "notebook-" + System.currentTimeMillis();
 
   private Map<String, URLClassLoader> cleanCl = Collections
       .synchronizedMap(new HashMap<String, URLClassLoader>());
@@ -826,7 +822,6 @@ public class InterpreterFactory implements InterpreterGroupFactory {
         logger.error("Can't close interpreterGroup", e);
       }
     }
-    clearOutputDirectory();
   }
 
   private Interpreter createRepl(String dirName, String className,
@@ -892,41 +887,15 @@ public class InterpreterFactory implements InterpreterGroupFactory {
 
   private Interpreter createRemoteRepl(String interpreterPath, String noteId, String className,
       Properties property, String interpreterSettingId) {
-    RemoteInterpreterConfig config = new RemoteInterpreterConfig();
-    config.setClassName(className);
-    config.setNoteId(noteId);
-    config.setInterpreterPath(interpreterPath);
-    config.setInterpreterRunner(conf.getInterpreterRemoteRunnerPath());
-    config.setConnectTimeout(conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT));
-    config.setLocalRepoPath(conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId);
-    config.setMaxPoolSize(conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE));
-    config.setTimeoutInfo(createTimeoutInfo());
-    config.setMaxParagraphOutput(conf.getInt(PARAGRAPH_MAX_OUTPUT_KEY, 500000));
-    config.setParagraphOutputDir(getOutputDirectory());
-    LazyOpenInterpreter intp = new LazyOpenInterpreter(
-            new RemoteInterpreter(config, property, remoteInterpreterProcessListener));
+    int connectTimeout = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT);
+    String localRepoPath = conf.getInterpreterLocalRepoPath() + "/" + interpreterSettingId;
+    int maxPoolSize = conf.getInt(ConfVars.ZEPPELIN_INTERPRETER_MAX_POOL_SIZE);
+    TimeoutInfo timeoutInfo = createTimeoutInfo();
+    LazyOpenInterpreter intp = new LazyOpenInterpreter(new RemoteInterpreter(
+        property, noteId, className, conf.getInterpreterRemoteRunnerPath(),
+        interpreterPath, localRepoPath, connectTimeout,
+        maxPoolSize, timeoutInfo, remoteInterpreterProcessListener));
     return intp;
-  }
-
-  private String getOutputDirectory()
-  {
-    return Paths.get(
-            conf.getString(PARAGRAPH_OUTPUT_DIR_KEY, System.getProperty("java.io.tmpdir")))
-                .resolve(NOTEBOOK_DIRECTORY)
-                .toAbsolutePath().toString();
-  }
-
-  private void clearOutputDirectory()
-  {
-    File outputDirectory = new File(getOutputDirectory());
-    if(outputDirectory.exists() && outputDirectory.isDirectory())
-    {
-      for(File f : outputDirectory.listFiles())
-      {
-        f.delete();
-      }
-    }
-    outputDirectory.delete();
   }
 
   private TimeoutInfo createTimeoutInfo()

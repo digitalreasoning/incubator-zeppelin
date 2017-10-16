@@ -216,33 +216,18 @@ public class RemoteInterpreterEventClient implements ResourcePoolConnector {
     Map<String, String> appendOutput = new HashMap<String, String>();
     appendOutput.put("noteId", noteId);
     appendOutput.put("paragraphId", paragraphId);
-    String message = output;
-    if (message.length() > getParagraphMaxOutput())
-    {
-      message = "Output too large. Writing to file instead";
-    }
-    appendOutput.put("data", message);
+    appendOutput.put("data", output);
 
     sendEvent(new RemoteInterpreterEvent(
         RemoteInterpreterEventType.OUTPUT_APPEND,
         gson.toJson(appendOutput)));
   }
 
-  private int getParagraphMaxOutput()
-  {
-    return Integer.parseInt(System.getenv(RemoteInterpreterConfig.PARAGRAPH_MAX_OUTPUT_KEY));
-  }
-
   public void onInterpreterOutputUpdate(String noteId, String paragraphId, String output) {
     Map<String, String> appendOutput = new HashMap<String, String>();
     appendOutput.put("noteId", noteId);
     appendOutput.put("paragraphId", paragraphId);
-    String message = output;
-    if (message.length() > getParagraphMaxOutput())
-    {
-      message = "Output too large. Writing to file instead";
-    }
-    appendOutput.put("data", message);
+    appendOutput.put("data", output);
 
     sendEvent(new RemoteInterpreterEvent(
         RemoteInterpreterEventType.OUTPUT_UPDATE,
