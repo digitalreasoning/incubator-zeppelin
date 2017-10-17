@@ -27,11 +27,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.LongField;
-import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.TextField;
+import org.apache.lucene.document.*;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
@@ -274,7 +270,7 @@ public class LuceneSearch implements SearchService {
         doc.add(new TextField(SEARCH_FIELD_TITLE, p.getTitle(), Field.Store.YES));
       }
       Date date = p.getDateStarted() != null ? p.getDateStarted() : p.getDateCreated();
-      doc.add(new LongField("modified", date.getTime(), Field.Store.NO));
+      doc.add(new LegacyLongField("modified", date.getTime(), Field.Store.NO));
     } else {
       doc.add(new TextField(SEARCH_FIELD_TEXT, noteName, Field.Store.YES));
     }
