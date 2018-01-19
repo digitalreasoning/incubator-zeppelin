@@ -80,7 +80,8 @@
     <module>kylin</module>
     <module>python</module>
     <module>lens</module>
-    <module>cassandra</module>
+    <!-- Disabling because scalacetra pulls in a dependency that fails on artifactory -->
+    <!--<module>cassandra</module>-->
     <module>elasticsearch</module>
     <module>bigquery</module>
     <module>alluxio</module>
